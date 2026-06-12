@@ -353,14 +353,15 @@ public class HuntedEventManager {
      * This fires BEFORE the item leaves inventory so no duplication possible.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onItemDrop(net.neoforged.neoforge.event.entity.player.PlayerDropsEvent e) {
-        if (targetUUID == null) return;
-        if (!(e.getEntity() instanceof ServerPlayer player)) return;
-        if (!player.getUUID().equals(targetUUID)) return;
-        if (!player.isAlive()) return; // allow drop on death
-        // Remove any crown from the drops list — it never leaves inventory
-        e.getDrops().removeIf(drop -> drop.getItem().is(HuntedItems.CURSED_CROWN.get()));
+public static void onItemDrop(net.neoforged.neoforge.event.entity.player.PlayerDropItemEvent.ByUser e) {
+    if (targetUUID == null) return;
+    if (!(e.getEntity() instanceof ServerPlayer player)) return;
+    if (!player.getUUID().equals(targetUUID)) return;
+    if (!player.isAlive()) return;
+    if (e.getItemDrop().getItem().is(HuntedItems.CURSED_CROWN.get())) {
+        e.setCanceled(true);
     }
+}
 
     /** Allow crown to drop naturally on death so next player can pick it up */
     @SubscribeEvent(priority = EventPriority.HIGH)
