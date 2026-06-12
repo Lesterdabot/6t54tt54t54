@@ -51,14 +51,10 @@ public class HuntedEventManager {
 
     private static int particleTick = 0;
 
-    // ── Boot ───────────────────────────────────────────────────────────────
-
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent e) {
         server = e.getServer();
     }
-
-    // ── Public API ─────────────────────────────────────────────────────────
 
     public static boolean startEvent() {
         if (phase != Phase.IDLE) return false;
@@ -77,8 +73,6 @@ public class HuntedEventManager {
         return p != null ? p.getName().getString() : "none";
     }
 
-    // ── Tick ───────────────────────────────────────────────────────────────
-
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post e) {
         if (server == null) return;
@@ -88,8 +82,6 @@ public class HuntedEventManager {
             default     -> {}
         }
     }
-
-    // ── PREP ───────────────────────────────────────────────────────────────
 
     private static void tickPrep() {
         prepTicksLeft--;
@@ -101,8 +93,6 @@ public class HuntedEventManager {
         }
         if (prepTicksLeft <= 0) spawnChest();
     }
-
-    // ── CHEST SPAWN ────────────────────────────────────────────────────────
 
     private static void spawnChest() {
         if (server == null) { reset(); return; }
@@ -124,7 +114,6 @@ public class HuntedEventManager {
             }
         }
 
-        // Fallback to world spawn if nothing found
         if (landPos == null) {
             int y = overworld.getHeight(Heightmap.Types.MOTION_BLOCKING, 0, 0);
             landPos = new BlockPos(0, y, 0);
@@ -154,10 +143,7 @@ public class HuntedEventManager {
         HuntedMod.LOGGER.info("[Hunted] Chest spawned at {}", landPos);
     }
 
-    // ── ACTIVE ─────────────────────────────────────────────────────────────
-
     private static void tickActive() {
-        // Post-death scan
         if (scanningForNewTarget) {
             scanCooldown--;
             if (scanCooldown <= 0) {
@@ -166,7 +152,6 @@ public class HuntedEventManager {
             }
         }
 
-        // Event timer — only ticks once someone has the crown
         if (targetUUID != null || scanningForNewTarget) {
             eventTicksLeft--;
             int secsLeft = eventTicksLeft / 20;
@@ -187,21 +172,18 @@ public class HuntedEventManager {
 
         if (scanningForNewTarget || targetUUID == null) return;
 
-        // Coord broadcast
         broadcastTicksLeft--;
         if (broadcastTicksLeft <= 0) {
             broadcastTargetCoords();
             broadcastTicksLeft = HuntedConfig.BROADCAST_INTERVAL_SECONDS.get() * 20;
         }
 
-        // Refresh glowing effect every 3s
         if (broadcastTicksLeft % 60 == 0) {
             ServerPlayer target = server.getPlayerList().getPlayer(targetUUID);
             if (target != null)
                 target.addEffect(new MobEffectInstance(MobEffects.GLOWING, 80, 0, false, false));
         }
 
-        // Particle column every second
         particleTick++;
         if (particleTick >= 20) {
             particleTick = 0;
@@ -231,7 +213,7 @@ public class HuntedEventManager {
         double x = target.getX(), y = target.getY(), z = target.getZ();
         ServerLevel level = (ServerLevel) target.level();
         for (int i = 0; i < 6; i++) {
-            level.sendParticles(ParticleTypes.FLAME,       x, y + (i * 1.8), z, 2, 0.1,  0.1,  0.1,  0.02);
+            level.sendParticles(ParticleTypes.FLAME,            x, y + (i * 1.8), z, 2, 0.1,  0.1,  0.1,  0.02);
             level.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, x, y + (i * 1.8), z, 1, 0.15, 0.15, 0.15, 0.05);
         }
     }
@@ -244,12 +226,11 @@ public class HuntedEventManager {
                 return;
             }
         }
-        // Crown still on ground?
         for (ServerLevel level : server.getAllLevels()) {
             if (!level.getEntitiesOfClass(ItemEntity.class,
                     new AABB(-30000, -64, -30000, 30000, 320, 30000),
                     ie -> ie.getItem().is(HuntedItems.CURSED_CROWN.get())).isEmpty()) {
-                return; // still waiting
+                return;
             }
         }
         broadcast("§6[Hunted] §eThe crown vanished! Hunt over.");
@@ -262,9 +243,7 @@ public class HuntedEventManager {
         int tx = (int) target.getX(), ty = (int) target.getY(), tz = (int) target.getZ();
 
         int secsLeft = eventTicksLeft / 20;
-        int minsLeft = secsLeft / 60;
-        int secs     = secsLeft % 60;
-        String timeStr = minsLeft + "m " + secs + "s";
+        String timeStr = (secsLeft / 60) + "m " + (secsLeft % 60) + "s";
 
         for (ServerPlayer viewer : server.getPlayerList().getPlayers()) {
             if (viewer.getUUID().equals(targetUUID)) {
@@ -274,7 +253,7 @@ public class HuntedEventManager {
             }
             double dx = tx - viewer.getX();
             double dz = tz - viewer.getZ();
-            int dist  = (int) Math.sqrt(dx * dx + dz * dz);
+            int dist   = (int) Math.sqrt(dx * dx + dz * dz);
             String dir = getCardinalDirection(dx, dz);
             String msg = HuntedConfig.MSG_COORDS_BROADCAST.get()
                 .replace("{player}", target.getName().getString())
@@ -288,9 +267,6 @@ public class HuntedEventManager {
         }
     }
 
-    // ── Events ─────────────────────────────────────────────────────────────
-
-    /** Open event chest — force crown to offhand, become target */
     @SubscribeEvent
     public static void onChestOpen(PlayerInteractEvent.RightClickBlock e) {
         if (phase != Phase.ACTIVE) return;
@@ -308,16 +284,14 @@ public class HuntedEventManager {
             }
         }
 
-        // Push current offhand to inventory if occupied
         ItemStack currentOffhand = player.getInventory().offhand.get(0);
         if (!currentOffhand.isEmpty()) player.getInventory().add(currentOffhand);
         player.getInventory().offhand.set(0, new ItemStack(HuntedItems.CURSED_CROWN.get(), 1));
-
         chestLevel.setBlock(chestPos, Blocks.AIR.defaultBlockState(), 3);
         setTarget(player);
     }
 
-    /** Lock crown to offhand every tick — prevent move/drop */
+    /** Lock crown to offhand every tick */
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post e) {
         if (phase != Phase.ACTIVE || targetUUID == null) return;
@@ -328,10 +302,9 @@ public class HuntedEventManager {
         boolean inOffhand   = player.getInventory().offhand.get(0).is(HuntedItems.CURSED_CROWN.get());
         boolean inInventory = player.getInventory().items.stream().anyMatch(s -> s.is(HuntedItems.CURSED_CROWN.get()));
 
-        if (inOffhand) return; // all good
+        if (inOffhand) return;
 
         if (inInventory) {
-            // Moved to main inventory — push back to offhand
             for (int i = 0; i < player.getInventory().items.size(); i++) {
                 if (player.getInventory().items.get(i).is(HuntedItems.CURSED_CROWN.get())) {
                     ItemStack crown = player.getInventory().items.get(i).copy();
@@ -343,36 +316,19 @@ public class HuntedEventManager {
                 }
             }
         } else {
-            // Completely gone while alive — restore silently
             player.getInventory().offhand.set(0, new ItemStack(HuntedItems.CURSED_CROWN.get(), 1));
         }
     }
 
-    /**
-     * Cancel Q-drop of the crown entirely.
-     * This fires BEFORE the item leaves inventory so no duplication possible.
-     */
+    /** Block crown from dropping unless target is dying */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-public static void onItemDrop(net.neoforged.neoforge.event.entity.player.PlayerDropItemEvent.ByUser e) {
-    if (targetUUID == null) return;
-    if (!(e.getEntity() instanceof ServerPlayer player)) return;
-    if (!player.getUUID().equals(targetUUID)) return;
-    if (!player.isAlive()) return;
-    if (e.getItemDrop().getItem().is(HuntedItems.CURSED_CROWN.get())) {
-        e.setCanceled(true);
-    }
-}
-
-    /** Allow crown to drop naturally on death so next player can pick it up */
-    @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onLivingDrops(LivingDropsEvent e) {
         if (targetUUID == null) return;
         if (!(e.getEntity() instanceof ServerPlayer player)) return;
-        if (player.getUUID().equals(targetUUID)) return; // target dying — allow drop
+        if (player.getUUID().equals(targetUUID) && !player.isAlive()) return;
         e.getDrops().removeIf(drop -> drop.getItem().is(HuntedItems.CURSED_CROWN.get()));
     }
 
-    /** Target killed — crown drops, start scanning for new holder */
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent e) {
         if (phase != Phase.ACTIVE || targetUUID == null) return;
@@ -392,7 +348,6 @@ public static void onItemDrop(net.neoforged.neoforge.event.entity.player.PlayerD
         scanCooldown         = 40;
     }
 
-    /** Protect chest until claimed */
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent e) {
         if (phase != Phase.ACTIVE || chestPos == null || targetUUID != null) return;
@@ -401,8 +356,6 @@ public static void onItemDrop(net.neoforged.neoforge.event.entity.player.PlayerD
             p.sendSystemMessage(Component.literal("§c[Hunted] This chest is protected!"));
         e.setCanceled(true);
     }
-
-    // ── Helpers ────────────────────────────────────────────────────────────
 
     private static void setTarget(ServerPlayer player) {
         targetUUID         = player.getUUID();
