@@ -385,25 +385,14 @@ public class HuntedEventManager {
         pickupCheckCountdown = 20; // check after 1 second
     }
 
-    /** Prevent dropping the crown */
-    @SubscribeEvent
-    public static void onItemDrop(PlayerEvent.ItemPickupEvent e) {
-        // handled via death only
-    }
-
-    /** Cancel crown drop attempts */
-    @SubscribeEvent
-    public static void onDropItem(net.neoforged.neoforge.event.entity.player.PlayerDropsEvent e) {
-        if (targetUUID == null) return;
-        if (!(e.getEntity() instanceof ServerPlayer player)) return;
-        // Only prevent drop if player is NOT dying (living players can't drop it)
-        // On death we WANT it to drop — that's the transfer mechanic
-        // So we only cancel drops that happen while alive
-        if (player.isAlive()) {
-            e.getDrops().removeIf(item -> item.getItem().is(HuntedItems.CURSED_CROWN.get()));
-            player.getInventory().add(new ItemStack(HuntedItems.CURSED_CROWN.get(), 1));
-        }
-    }
+   /** Cancel crown drop attempts while alive */
+@SubscribeEvent
+public static void onLivingDrops(net.neoforged.neoforge.event.entity.living.LivingDropsEvent e) {
+    if (targetUUID == null) return;
+    if (!(e.getEntity() instanceof ServerPlayer player)) return;
+    if (player.getUUID().equals(targetUUID)) return; // allow drop on death
+    e.getDrops().removeIf(item -> item.getItem().is(HuntedItems.CURSED_CROWN.get()));
+}
 
     /** Target death — drop crown, start scanning */
     @SubscribeEvent
